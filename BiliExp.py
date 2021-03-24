@@ -11,21 +11,15 @@ try:
 except:
     from json import loads
 
-main_version = (1, 2, 0)
+main_version = (1, 2, 1)
 main_version_str = '.'.join(map(str, main_version))
-
-def version_compare(version: str):
-    ver = tuple(map(int, version.strip().split('.')))
-    for ii in range(len(main_version)):
-        if ver[ii] < main_version[ii]:
-            return False
-    return True
 
 def initlog(log_file: str, log_console: bool, msg_raw: bool = False):
     '''初始化日志参数'''
     logger_raw = logging.getLogger()
     logger_raw.setLevel(logging.INFO)
-    formatter1 = logging.Formatter("[%(levelname)s]: %(message)s")
+    formatter1 = logging.Formatter("[%(asctime)s] [%(levelname)s]: %(message)s")
+    formatter1.converter = lambda x: time.localtime(x + 28800 + time.timezone) #时区转换
     if log_file:
         try:
             file_handler = logging.FileHandler(log_file, encoding='utf-8')#输出到日志文件
@@ -75,19 +69,20 @@ def load_config(path: str) -> OrderedDict:
 async def start(configData: dict):
     '''开始任务'''
     config_version = configData.get('version', '1.0.0')
-    if version_compare(config_version):
+    if tuple(map(int, config_version.strip().split('.'))) == main_version:
         logging.info(f'当前程序版本为v{main_version_str},配置文件版本为v{config_version}')
     else:
-        logging.warning(f'当前程序版本为v{main_version_str},配置文件版本为v{config_version},可更新配置文件')
-        tasks.webhook.addMsg('msg_simple', '有新版本配置文件可供使用\n')
-    
-    await asyncio.wait([run_user_tasks(user, configData["default"]) for user in configData["users"]]) #执行任务
+        logging.warning(f'当前程序版本为v{main_version_str},配置文件版本为v{config_version},版本不匹配可能带来额外问题')
+        tasks.webhook.addMsg('msg_simple', '配置文件版本不匹配\n')
+
+    await asyncio.wait([asyncio.create_task(run_user_tasks(user, configData["default"], configData.get("http_header", None))) for user in configData["users"]]) #执行任务
     await tasks.webhook.send() #推送消息
 
 async def run_user_tasks(user: dict,           #用户配置
-                         default: dict          #默认配置
+                         default: dict,        #默认配置
+                         header: dict = None
                          ) -> None:
-    async with asyncbili() as biliapi:
+    async with asyncbili(header) as biliapi:
         try:
             if not await biliapi.login_by_cookie(user["cookieDatas"]):
                 logging.warning(f'id为{user["cookieDatas"]["DedeUserID"]}的账户cookie失效，跳过此账户后续操作')
@@ -122,18 +117,19 @@ async def run_user_tasks(user: dict,           #用户配置
             if task in user["tasks"]:
                 if isinstance(user["tasks"][task], bool):
                     if user["tasks"][task]:
-                        task_array.append(task_function(biliapi))
+                        task_array.append(asyncio.create_task(task_function(biliapi)))
                 elif isinstance(user["tasks"][task], dict):
                     if 'enable' in user["tasks"][task] and user["tasks"][task]["enable"]:
-                        task_array.append(task_function(biliapi, user["tasks"][task]))
+                        task_array.append(asyncio.create_task(task_function(biliapi, user["tasks"][task])))
+
             else:
                 if isinstance(default[task], bool):
                     if default[task]:
-                        task_array.append(task_function(biliapi))
+                        task_array.append(asyncio.create_task(task_function(biliapi)))
                 elif isinstance(default[task], dict):
                     if 'enable' in default[task] and default[task]["enable"]:
-                        task_array.append(task_function(biliapi, default[task]))
-
+                        task_array.append(asyncio.create_task(task_function(biliapi, default[task])))
+        
         if task_array:
             await asyncio.wait(task_array)        #异步等待所有任务完成
 
@@ -151,7 +147,7 @@ def main(*args, **kwargs):
 
     #启动任务
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(start(configData))
+    loop.run_until_complete(loop.create_task(start(configData)))
 
 if __name__=="__main__":
     kwargs = {}
