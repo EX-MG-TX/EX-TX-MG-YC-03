@@ -12,11 +12,20 @@ elif find_spec('wasm_enc'):
 else:
     enc_server = 'https://1578907340179965.cn-shanghai.fc.aliyuncs.com/2016-08-15/proxy/bili_server/heartbeat/'
 
+_default_headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36",
+    "Referer": "https://www.bilibili.com/",
+    'Connection': 'keep-alive'
+    }
+
 class asyncBiliApi(object):
     '''B站异步接口类'''
-    def __init__(self):
-
-        headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/63.0.3239.108","Referer": "https://www.bilibili.com/",'Connection': 'keep-alive'}
+    def __init__(self,
+                 headers: Optional[Dict[str, str]]
+                 ):
+        if not headers:
+            headers = _default_headers
+        
         self._islogin = False
         self._show_name = None
         self._session = ClientSession(
@@ -423,6 +432,12 @@ class asyncBiliApi(object):
             "csrf": self._bili_jct
             }
         async with self._session.post(url, data=post_data, verify_ssl=False) as r:
+            return await r.json()
+
+    async def vipPrivilegeList(self) -> Awaitable[Dict[str, Any]]:
+        '''获取B站大会员权益列表(B币劵，优惠券)'''
+        url = 'https://api.bilibili.com/x/vip/privilege/my'
+        async with self._session.get(url, verify_ssl=False) as r:
             return await r.json()
 
     async def getUserWallet(self, 
@@ -1072,8 +1087,8 @@ class asyncBiliApi(object):
 
     async def mangaPayBCoin(self, 
                             pay_amount: int, 
-                            product_id=1, 
-                            platform='web'
+                            product_id: int = 1, 
+                            platform: str = 'web'
                             ) -> Awaitable[Dict[str, Any]]:
         '''
         B币购买漫画
@@ -1083,7 +1098,7 @@ class asyncBiliApi(object):
         '''
         url = f'https://manga.bilibili.com/twirp/pay.v1.Pay/PayBCoin?platform={platform}'
         post_data = {
-            "pay_amount": pay_amount,
+            "pay_amount": str(pay_amount),
             "product_id": product_id
             }
         async with self._session.post(url, json=post_data, verify_ssl=False) as r:
