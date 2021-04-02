@@ -23,7 +23,7 @@ async def activity_task(biliapi: asyncbili,
     if 'activities' in task_config:
         activity_list.extend(task_config["activities"])
     for x in activity_list:
-        for y in range(2, 5):
+        for y in range(1, 20):
             try:
                 await biliapi.activityAddTimes(x["sid"], y) #执行增加抽奖次数操作,一般是分享转发
             except Exception as e:
@@ -50,6 +50,6 @@ async def activity_task(biliapi: asyncbili,
                         logging.info(f'{biliapi.name}: 参与({x["name"]})活动第({ii + 1}/{times})次，结果为({ret["data"][0]["gift_name"]})')
                         if not ret["data"][0]["gift_name"] == '未中奖0':
                             webhook.addMsg('msg_simple', f'{biliapi.name}:参与({x["name"]})活动获得({ret["data"][0]["gift_name"]})\n')
-                    await asyncio.sleep(6) #抽奖延时
+                    await asyncio.sleep(25) #抽奖延时
             except Exception as e:
                 logging.warning(f'{biliapi.name}: 参与({x["name"]})活动异常，原因为({str(e)})')
