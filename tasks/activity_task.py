@@ -23,9 +23,10 @@ async def activity_task(biliapi: asyncbili,
     if 'activities' in task_config:
         activity_list.extend(task_config["activities"])
     for x in activity_list:
-        for y in range(1, 20):
+        for y in range(1, 15):
             try:
-                await biliapi.activityAddTimes(x["sid"], y) #执行增加抽奖次数操作,一般是分享转发
+                await biliapi.activityAddTimes(x["sid"], y) #执行增加抽奖次数操作,一般是分享
+                await asyncio.sleep(2) #抽奖延时
             except Exception as e:
                 logging.warning(f'{biliapi.name}: 增加({x["name"]})活动抽奖次数异常,原因为({str(e)})')
 
@@ -33,6 +34,7 @@ async def activity_task(biliapi: asyncbili,
             ret = await biliapi.activityMyTimes(x["sid"])
             if ret["code"] == 0:
                 times = ret["data"]["times"]
+                logging.info(f'{biliapi.name}---{x["name"]}---{times}')
             else:
                 logging.info(f'{biliapi.name}: 获取({x["name"]})活动抽奖次数错误，消息为({ret["message"]})')
                 continue
